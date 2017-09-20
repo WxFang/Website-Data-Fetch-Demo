@@ -1,26 +1,27 @@
 import xml.etree.cElementTree as ET
-import urllib2, StringIO
+import urllib
+from bs4 import BeautifulSoup
 import json
-import time
 import csv
 
-def loadXML():
-    page = urllib2.urlopen(r'http://www.related.com/feeds/ZillowAvailabilities.xml')
-    io_xml = StringIO.StringIO()
-    io_xml.write(page.read())
-    io_xml.seek(0)
-    return io_xml
-
-def parseXML(xmlfile):
-    tree = ET.parse(xmlfile)
-    root = tree.getroot()
+def scrape():
+    theurl = "https://www.corcoran.com/nyc/Search/Listings?SaleType=Rent&Page="
+    count = 1
+    page = 0
     lists = []
-    for list in root:
-        addr = list[0][0].text
-        city = list[0][2].text
-        state = list[0][3].text
-        zip = list[0][4].text
-        lists.append([addr, city, state, zip])
+    # iterate each page until empty page
+    while count > 0:
+        thepage = urllib.urlopen(theurl + "%d" % page)
+        soup = BeautifulSoup(thepage, "html.parser")
+        # count listings on one page
+        count = 0
+        for listing in soup.findAll('span', {"class": "address"}):
+            attrs = listing.find('a').attrs
+            id = attrs['data-listingid']
+            addr = attrs['title']
+            lists.append([id, addr])
+            count += 1
+        page += 1
     return lists
 
 def googleGeoAPI(lists):
@@ -30,10 +31,10 @@ def googleGeoAPI(lists):
     result = [list + [0] + [0] for list in lists]
     count = 0
     for list in lists:
-        addP = "address=" + list[0] + "+" + list[1] + "+" + list[2] + "+" + list[3]
+        addP = "address=" + list[1]
         addP = addP.replace(" ", "+")
         geoUrl = base + addP + "&key=" + key
-        response = urllib2.urlopen(geoUrl)
+        response = urllib.urlopen(geoUrl)
         jsonRaw = response.read()
         jsonData = json.loads(jsonRaw)
         if jsonData['status'] == 'OK':
@@ -43,15 +44,14 @@ def googleGeoAPI(lists):
         count += 1
     return result
 
-def saveToCsv(result, filename):
 
+def saveToCsv(result, filename):
     with open(filename, 'wb') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerows(result)
 
 def main():
-    xmlfile = loadXML()
-    lists = parseXML(xmlfile)
+    lists = scrape()
     result = googleGeoAPI(lists)
     saveToCsv(result, 'location.csv')
 
