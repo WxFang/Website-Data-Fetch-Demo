@@ -52,8 +52,11 @@ def saveToCsv(result, filename):
 
 def main():
     lists = scrape()
+    print "finish scraping from website..."
     result = googleGeoAPI(lists)
+    print "finish querying from google geo api..."
     saveToCsv(result, 'location.csv')
+    print "finish saving to csv file"
 
 if __name__ == "__main__":
     main()
